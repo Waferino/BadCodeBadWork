@@ -61,6 +61,11 @@ module Commands =
         let ymd = dmy.Split([|'.'|]) |> Array.rev |> Array.fold (fun acc t -> sprintf "%s%s-" acc t) "" |> (fun x -> x.Substring(0, x.Length - 1))
         sprintf "%s %s" ymd tm
     )
+    let CopyObj (target: 'T) =
+        let t = typeof<'T>
+        let neo = Activator.CreateInstance(t) :?> 'T
+        let values = Getter target |> Array.map (fun (_, v) -> v)
+        target, Setter neo values
     let SC man_id (a: 'T, dt: 'T) =    //SmartChecker
         if a <> Unchecked.defaultof<'T> && a <> dt then 
             printfn "For_Account(%s):\tOld value: %O\t->\tNew value: %O" man_id dt a

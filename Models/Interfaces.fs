@@ -8,6 +8,7 @@ type IBaseSQLCommands =
     abstract member Get : 'T -> seq<'T>
     abstract member GetFromType : System.Type -> seq<'T> option
     abstract member GetWhere : string -> string -> seq<obj []>
+    abstract member GetFiltered : 'T -> ('T -> bool) -> seq<'T>
     abstract member Insert : string -> string -> string -> string
     abstract member Update : string -> string -> string -> string
     abstract member GetPK : System.Type -> int
@@ -27,8 +28,8 @@ type IMyDBContext =
     abstract member InsertEventInfo : EventInfo -> bool
     abstract member InsertEvent : Starikov.dbModels.Event -> bool
     abstract member InsertExtraEvent : Starikov.dbModels.ExtraEvent -> bool
-    abstract member GetAnceteData : string -> Anceta
-    abstract member SetAnceteData : string -> Anceta -> bool
+    abstract member GetAnceteData : obj -> Anceta
+    abstract member SetAnceteData : obj -> Anceta -> bool
 type IMessager =
     abstract member SendMessage : string -> string -> seq<string * string> -> unit
 type IAccountRegistrationHelper =

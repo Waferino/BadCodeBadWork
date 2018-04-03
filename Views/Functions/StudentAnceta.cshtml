@@ -202,7 +202,10 @@
               <label for="educationType" class="col-md-2 control-label" title="">Форма обучения:</label>
               <div>
                   <div class="col-md-2">
-                      <input class="form-control" asp-for="educationType" value="@Model.educationType" placeholder="бюджет/контракт" />
+                      <select class="form-control" asp-for="educationType" value="@Model.educationType" placeholder="бюджет/контракт" />
+                        <option>бюджет</option>
+                        <option>контракт</option>
+                      </select>
                   </div>
               </div>
           </div>
