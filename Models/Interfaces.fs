@@ -8,7 +8,7 @@ type IBaseSQLCommands =
     abstract member Get : 'T -> seq<'T>
     abstract member GetFromType : System.Type -> seq<'T> option
     abstract member GetWhere : string -> string -> seq<obj []>
-    abstract member GetFiltered : 'T -> ('T -> bool) -> seq<'T>
+    abstract member GetFiltered : ('T -> bool) -> seq<'T>
     abstract member Insert : string -> string -> string -> string
     abstract member Update : string -> string -> string -> string
     abstract member GetPK : System.Type -> int

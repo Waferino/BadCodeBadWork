@@ -103,8 +103,8 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
         this.ViewData.["IsStudent"] <- this.User.Claims |> Commands.IsStudent
         if this.User.Identity.IsAuthenticated then this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
         let EventsInfos = this.ctx.GetEventsInfos
-        let retD = EventsInfos |> Seq.filter (fun ei -> ei.DateOfThe.HasValue) |> Seq.sortBy (fun ei -> ei.DateOfThe.Value)
-        let retU = EventsInfos |> Seq.filter (fun ei -> not <| ei.DateOfThe.HasValue) |> Seq.sortBy (fun ei -> ei.Name)
+        let retD = EventsInfos |> Seq.filter (fun ei -> String.IsNullOrEmpty(ei.DateOfThe) |> not) |> Seq.map (fun ei -> DateTime.Parse(ei.DateOfThe), ei) |> Seq.sortBy (fun (d, _) -> d) |> Seq.map (fun (_, ei) -> ei)
+        let retU = EventsInfos |> Seq.filter (fun ei -> String.IsNullOrEmpty(ei.DateOfThe)) |> Seq.sortBy (fun ei -> ei.Name)
         let ret = seq { for ei in retD -> ei
                         for ei in retU -> ei }
         if this.User.Identity.IsAuthenticated then
@@ -119,18 +119,20 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
         this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
         this.ViewData.["id_man"] <- this.User.Identity.Name |> int
-        this.View(new Starikov.dbModels.EventInfo())
+        this.ViewData.["IsCurator"] <- this.User.Claims |> Commands.IsCurator
+        this.View(new Starikov.dbModels.EventInfo(whosEvent = "Студентов"))
     [<Authorize>]
     [<HttpPost>]
     member this.CreateEvent (event: EventInfo) = //INSERT INTO `www0005_base`.`eventinfo` (`DateOfThe`, `Name`) VALUES ('2010.11.10', 'Поход на лыжах');
         let sei = this.ctx.GetEventsInfos |> Seq.filter (fun ei -> ei.id_EventInfo = event.id_EventInfo) |> Seq.tryHead
+        event.creatingDate <- DateTime.Now.ToString("MM-dd-yyyy")
         if sei.IsNone then
             let res = this.ctx.InsertEventInfo event
             res |> printfn "Event(\"%s\") is created? <%b>" event.Name
         else 
             let ei = sei.Value
             let query, logs = QueryBuilder.BuildUpdateQuery ei event
-            (this.ctx :?> IBaseSQLCommands).Execute query logs |> ignore
+            (this.ctx :?> IBaseSQLCommands).Execute query logs |> printfn "Event(\"%s\") is updated? <%s>" event.Name
         //if res then printfn "Event: \"%s\" was inserted" event.Name else printfn "Broken inserting Event: \"%s\"" event.Name
         this.RedirectToAction("EventsInfo")
     [<Authorize>]
@@ -138,6 +140,7 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
         this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
         this.ViewData.["id_man"] <- this.User.Identity.Name |> int
+        this.ViewData.["IsCurator"] <- this.User.Claims |> Commands.IsCurator
         let ei = this.ctx.GetEventsInfos |> Seq.filter (fun ei -> ei.id_EventInfo = id) |> Seq.head
         this.View(ei)
     [<Authorize>]
@@ -230,14 +233,19 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
     member this.StudentAnceta () =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
         this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
-        let groups = this.ctx.GetGroups |> Seq.map (fun g -> g.name_group)
-        this.ViewData.["Groups"] <- groups
+        this.ViewData.["Groups"] <- this.ctx.GetGroups |> Seq.map (fun g -> g.name_group)
+        this.ViewData.["Languages"] <- (this.ctx :?> IBaseSQLCommands).Get (new LanguageDictionary()) |> Seq.map (fun lang -> lang.langName)
+        this.ViewData.["Family_Status"] <- this.ctx.GetAccount this.User.Identity.Name |> fun ai -> ai.Person.pol |> function "1" -> ["Женат"; "Холост"] | "2" -> ["Замужем"; "Не замужем"] | _ -> ["Женат"; "Холост"; "Замужем"; "Не замужем"]
         this.View(this.ctx.GetAnceteData <| this.User.Identity.Name)
     [<Authorize>]
     [<HttpPost>]
     member this.StudentAnceta (ancet: Anceta) =
         let res = this.ctx.SetAnceteData this.User.Identity.Name ancet
-        this.RedirectToAction("Index", "Home")
+        if res |> not then 
+            printfn "При обработке анкеты(%s) возникли проблеммы" ( sprintf "%s %c.%c." ancet.lastname ancet.name.[0] ancet.patron.[0] )
+            this.RedirectToAction("Functions", "StudentAnceta", ancet)
+        else
+            this.RedirectToAction("Index", "Home")
     [<Authorize(Policy = "CuratorOnly")>]
     member this.MessageToGroup (id_group: int) =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
@@ -251,9 +259,10 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
             let s = this.ctx.GetStudents |> Seq.filter (fun st -> st.id_group.HasValue && st.id_group.Value = model.id_group)
             if Seq.length <| s > 0 then s |> Seq.map (fun st -> st.id_man) else Seq.empty
         if students |> Seq.isEmpty |> not then
-            let peoples_data = this.ctx.GetPeoples |> Seq.filter (fun p -> (Seq.contains p.id_man students) && (String.IsNullOrEmpty(p.e_mail) |> not)) |> Seq.map (fun p -> ((sprintf "%s %c.%c." p.fam p.name.[0] p.otchestvo.[0]), p.e_mail))
-            if peoples_data |> Seq.isEmpty |> not then
-                this.messager.SendMessage model.message_subject model.message_body peoples_data
+            let peoples_data = this.ctx.GetPeoples |> Seq.filter (fun p -> (Seq.contains p.id_man students)) //|> Seq.map (fun p -> ((sprintf "%s %c.%c." p.fam p.name.[0] p.otchestvo.[0]), p.id_man))
+            let accs_data = (this.ctx :?> IBaseSQLCommands).GetFiltered (fun (a: dbModels.Account) -> peoples_data |> Seq.map (fun p -> p.id_man) |> Seq.contains a.id_man) |> Seq.map (fun a -> peoples_data |> Seq.filter (fun p -> p.id_man = a.id_man) |> Seq.head |> fun p -> ((sprintf "%s %c.%c." p.fam p.name.[0] p.otchestvo.[0]), a.Email))
+            if accs_data |> Seq.isEmpty |> not then
+                this.messager.SendMessage model.message_subject model.message_body accs_data
             else
                 printfn "Error in message to group(%d): missing e_mails" model.id_group
         else
@@ -271,8 +280,9 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
     member this.MessageToStudent (model: MessageToStudentModel) =
         let student = this.ctx.GetPeoples |> Seq.filter (fun p -> p.id_man = model.id_student) |> Seq.tryHead
         if student.IsSome then
-            let student_data = seq { yield (this.ctx.GetFIO student.Value.id_man, student.Value.e_mail) }
-            if String.IsNullOrEmpty(student.Value.e_mail) |> not then
+            let acc = (this.ctx :?> IBaseSQLCommands).GetFiltered (fun (a: dbModels.Account) -> a.id_man = student.Value.id_man) |> Seq.tryHead
+            if acc.IsSome then
+                let student_data = seq { yield (this.ctx.GetFIO student.Value.id_man, acc.Value.Email) }
                 this.messager.SendMessage model.message_subject model.message_body student_data
             else
                 printfn "Error in message to student(%d): missing e_mails" model.id_student

@@ -31,7 +31,7 @@ type AccountController (context: IMyDBContext, arh: IAccountRegistrationHelper) 
         this.View(new RegisterViewModel())
     [<HttpPost>]
     [<AllowAnonymousAttribute>]
-    member this.Register (regInfo: RegisterViewModel(*Lastname: string, Firstname: string, Midlename: string, Email: string, Password: string, rePasword: string, SpecialWord: string*)) =
+    member this.Register (regInfo: RegisterViewModel (*Lastname: string, Firstname: string, Midlename: string, Email: string, Password: string, rePasword: string, SpecialWord: string*)) =
         //let regInfo = new RegisterViewModel(Lastname = Lastname(*, Firstname = Firstname, Midlename = Midlename, Email = Email, Password = Password, rePassword = rePasword, SpecialWord = SpecialWord*))
         printfn "User(%s) trying to register..." regInfo.Email
         let Authenticate user_id role =
@@ -40,10 +40,28 @@ type AccountController (context: IMyDBContext, arh: IAccountRegistrationHelper) 
             claims.Add(new Claim("PSTU_Role", role))
             let id = new ClaimsIdentity(claims, "ApplicationCookie", ClaimsIdentity.DefaultNameClaimType, ClaimsIdentity.DefaultRoleClaimType)
             this.HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(id))
+        let Spaceless s = s |> Seq.filter (fun c -> c <> ' ') |> Seq.fold (fun state e -> sprintf "%s%c" state e) ""
+        //let FIO_equa (surname: string) (name: string) (patron: string) = sprintf "%s %c. %c." (surname.ToLowerInvariant()) ((name.ToLowerInvariant()) |> Seq.head) ((patron.ToLowerInvariant()) |> Seq.head)
         let self_user = 
-            this.ctx.GetPeoples //|> Seq.toArray//|> Array.Parallel.partition
-            |> Seq.filter (fun p -> (*(p.fam.ToLowerInvariant() = regInfo.Lastname.ToLowerInvariant()) && (p.name.ToLowerInvariant() = regInfo.Firstname.ToLowerInvariant()) && (p.otchestvo.ToLowerInvariant() = regInfo.Midlename.ToLowerInvariant()) && *)(p.e_mail.ToLowerInvariant() = regInfo.Email.ToLowerInvariant())) //|> fun (g, ng) -> g
-            |> Seq.tryHead
+            let ps = 
+                this.ctx.GetPeoples //|> Seq.toArray//|> Array.Parallel.partition
+                |> Seq.filter (fun p -> (p.fam.ToLowerInvariant() |> Spaceless = (regInfo.Lastname.ToLowerInvariant() |> Spaceless))) //|> fun (g, ng) -> g
+                |> Seq.filter (fun p -> (p.name.ToLowerInvariant() |> Spaceless |> Seq.head = (regInfo.Firstname.ToLowerInvariant() |> Spaceless |> Seq.head)))
+                |> Seq.filter (fun p -> (p.otchestvo.ToLowerInvariant() |> Spaceless |> Seq.head =  (regInfo.Midlename.ToLowerInvariant() |> Spaceless |> Seq.head)))
+            // |> Seq.map (fun p -> 
+            //     printfn "%s" p.fam 
+            //     p)
+            if String.IsNullOrWhiteSpace(regInfo.Number) && ps |> Seq.length <= 1 then
+                ps |> Seq.tryHead
+            elif ps |> Seq.length > 1 then 
+                printfn "Регистрация невозможна! Необходимо обратиться к администратору БД!"
+                None
+            else
+                ps |> Seq.filter (fun p -> 
+                    let s = (this.ctx :?> IBaseSQLCommands).GetFiltered (fun (s: Student) -> s.id_man = p.id_man) |> Seq.head
+                    s.number_zach = regInfo.Number)
+                |> Seq.tryHead
+        self_user |> printfn "Inner val: \"%A\""
         if self_user.IsNone || (regInfo.Password.ToLowerInvariant() <> regInfo.rePassword.ToLowerInvariant()) then this.RedirectToAction("Register", regInfo)
         else
             let user = self_user.Value
@@ -55,7 +73,7 @@ type AccountController (context: IMyDBContext, arh: IAccountRegistrationHelper) 
                 if regInfo.SpecialWord |> isNull |> not && regInfo.SpecialWord.ToLowerInvariant() = specialWord_curator.ToLowerInvariant() then acc.Role <- "curator"
                 let res = this.ctx.InsertAccount acc
                 if res then 
-                    Authenticate acc.id_man acc.Role
+                    Authenticate acc.id_man acc.Role |> ignore
                     this.RedirectToAction("Index", "Home")
                 else
                     this.RedirectToAction("Register", regInfo)
@@ -85,6 +103,7 @@ type AccountController (context: IMyDBContext, arh: IAccountRegistrationHelper) 
     member this.ManageAccount () =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
         this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        this.ViewData.["IsCurator"] <- this.User.Claims |> Commands.IsCurator
         this.View()
     member this.Info () =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated

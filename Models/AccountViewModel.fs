@@ -12,6 +12,7 @@ type RegisterViewModel () =
     member val Lastname : string = null with get, set
     member val Firstname : string = null with get, set
     member val Midlename : string = null with get, set
+    member val Number : string = null with get, set
     //[<Required>]
     //[<EmailAddress>]
     //[<Display(Name = "Email")>]

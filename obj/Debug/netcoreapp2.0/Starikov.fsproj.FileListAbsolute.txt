@@ -81,3 +81,19 @@ C:\Users\VLADIMIR\AllAccessFolder\IGOR-PC\fsprojects\Starikov\bin\Debug\netcorea
 C:\Users\VLADIMIR\AllAccessFolder\IGOR-PC\fsprojects\Starikov\obj\Debug\netcoreapp2.0\Starikov.fsprojResolveAssemblyReference.cache
 C:\Users\VLADIMIR\AllAccessFolder\IGOR-PC\fsprojects\Starikov\obj\Debug\netcoreapp2.0\Starikov.dll
 C:\Users\VLADIMIR\AllAccessFolder\IGOR-PC\fsprojects\Starikov\obj\Debug\netcoreapp2.0\Starikov.pdb
+C:\Users\Igor Starikov\AllAccessFolder\fsprojects\Starikov\bin\Debug\netcoreapp2.0\Starikov.deps.json
+C:\Users\Igor Starikov\AllAccessFolder\fsprojects\Starikov\bin\Debug\netcoreapp2.0\Starikov.runtimeconfig.json
+C:\Users\Igor Starikov\AllAccessFolder\fsprojects\Starikov\bin\Debug\netcoreapp2.0\Starikov.runtimeconfig.dev.json
+C:\Users\Igor Starikov\AllAccessFolder\fsprojects\Starikov\bin\Debug\netcoreapp2.0\Starikov.dll
+C:\Users\Igor Starikov\AllAccessFolder\fsprojects\Starikov\bin\Debug\netcoreapp2.0\Starikov.pdb
+C:\Users\Igor Starikov\AllAccessFolder\fsprojects\Starikov\obj\Debug\netcoreapp2.0\Starikov.fsprojResolveAssemblyReference.cache
+C:\Users\Igor Starikov\AllAccessFolder\fsprojects\Starikov\obj\Debug\netcoreapp2.0\Starikov.dll
+C:\Users\Igor Starikov\AllAccessFolder\fsprojects\Starikov\obj\Debug\netcoreapp2.0\Starikov.pdb
+\\VLADIMIR-PC\AllAccessFolder\IGOR-PC\fsprojects\Starikov\bin\Debug\netcoreapp2.0\Starikov.deps.json
+\\VLADIMIR-PC\AllAccessFolder\IGOR-PC\fsprojects\Starikov\bin\Debug\netcoreapp2.0\Starikov.runtimeconfig.json
+\\VLADIMIR-PC\AllAccessFolder\IGOR-PC\fsprojects\Starikov\bin\Debug\netcoreapp2.0\Starikov.runtimeconfig.dev.json
+\\VLADIMIR-PC\AllAccessFolder\IGOR-PC\fsprojects\Starikov\bin\Debug\netcoreapp2.0\Starikov.dll
+\\VLADIMIR-PC\AllAccessFolder\IGOR-PC\fsprojects\Starikov\bin\Debug\netcoreapp2.0\Starikov.pdb
+\\VLADIMIR-PC\AllAccessFolder\IGOR-PC\fsprojects\Starikov\obj\Debug\netcoreapp2.0\Starikov.fsprojResolveAssemblyReference.cache
+\\VLADIMIR-PC\AllAccessFolder\IGOR-PC\fsprojects\Starikov\obj\Debug\netcoreapp2.0\Starikov.dll
+\\VLADIMIR-PC\AllAccessFolder\IGOR-PC\fsprojects\Starikov\obj\Debug\netcoreapp2.0\Starikov.pdb

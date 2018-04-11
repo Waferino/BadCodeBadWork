@@ -66,11 +66,20 @@ module Commands =
         let neo = Activator.CreateInstance(t) :?> 'T
         let values = Getter target |> Array.map (fun (_, v) -> v)
         target, Setter neo values
+    let Equal (old: 'T) (neo: 'T) =
+        //let T = typeof<'T>
+        let primus, secundus = Getter old, Getter neo
+        let length = Array.zip primus secundus |> Array.filter (fun ((_, ov), (_, nv)) -> ov <> nv) |> Array.length
+        match length with 0 -> true | _ -> false
     let SC man_id (a: 'T, dt: 'T) =    //SmartChecker
         if a <> Unchecked.defaultof<'T> && a <> dt then 
             printfn "For_Account(%s):\tOld value: %O\t->\tNew value: %O" man_id dt a
             true
         else false
+    let EntityToString entity =
+        // let T = entity.GetType()
+        let t = Getter entity
+        t |> Array.filter (fun (_, v) -> v |> isNull |> not) |> Array.fold (fun state (n, v) -> sprintf "%s{\"%s\" - \"%O\"}" state n v) ""
     let IsStudent (claims: seq<Security.Claims.Claim>) = claims |> Seq.tryFind (fun c -> c.Type = "PSTU_Role") |> (fun claim -> if claim.IsNone then false else claim.Value.Value = "student")
     let IsCurator (claims: seq<Security.Claims.Claim>) = claims |> Seq.tryFind (fun c -> c.Type = "PSTU_Role") |> (fun claim -> if claim.IsNone then false else claim.Value.Value = "curator")
     //let ShowClaims (claims: seq<Security.Claims.Claim>) = claims |> Seq.iter (fun c -> printfn "Type: \"%s\"\tValueType: \"%s\"\tValue: \"%s\"" c.Type c.ValueType c.Value)
@@ -134,12 +143,28 @@ module QueryBuilder =
         let T = old.GetType()
         let table = T.Name
         let id_name, id_value = QueryBuilderHelper.GetID old
-        (sprintf "UPDATE `%s` SET %s WHERE `%s`='%O'" table values id_name id_value), (Logs |> List.fold (fun st s -> sprintf "%s{%s}" st s ) (sprintf "{|%s|}" table))
+        let query, logs = (sprintf "UPDATE `%s` SET %s WHERE `%s`='%O'" table values id_name id_value), (Logs |> List.fold (fun st s -> sprintf "%s{%s}" st s ) (sprintf "{|%s|}" table))
+        printfn "Buildered query: {%s}" query
+        query, logs
     let BuildDeleteQuery entity =
         let T = entity.GetType()
         let logs = QueryBuilderHelper.GetPropertiesAndValues entity |> Seq.fold (fun st (pi, v) -> sprintf "%s{`%s`: '%O'}" st pi.Name v ) (sprintf "{|%s|}" T.Name)
         let id_name, id_value = QueryBuilderHelper.GetID entity
         (sprintf "DELETE FROM `%s` WHERE `%s`='%O'" T.Name id_name id_value), logs
+    let BuildInsertQueryWithAI entity =
+        let T = entity.GetType()
+        let table = T.Name.ToLowerInvariant()
+        let names, values = Commands.Getter entity |> Array.filter (fun (_, v) -> v |> isNull |> not) |> Array.map (fun (n, v) -> (("`" + n + "`"), sprintf "'%O'" v)) |> Array.unzip
+        let fNames = names.[1..] |> Array.fold (sprintf "%s, %s") "" |> Seq.tail |> Seq.fold (sprintf "%s%c") ""
+        let fValues = values.[1..] |> Array.fold (sprintf "%s, %s") "" |> Seq.tail |> Seq.fold (sprintf "%s%c") "" |> sprintf "(%s)"
+        table, (sprintf "(%s)" fNames), fValues
+    let BuildInsertQueryWithoutAI entity =
+        let T = entity.GetType()
+        let table = T.Name.ToLowerInvariant()
+        let names, values = Commands.Getter entity |> Array.filter (fun (_, v) -> v |> isNull |> not) |> Array.map (fun (n, v) -> (("`" + n + "`"), sprintf "'%O'" v)) |> Array.unzip
+        let fNames = names |> Array.tail |> Array.fold (sprintf "%s, %s") (names |> Array.head |> sprintf "%O") |> sprintf "(%s)" 
+        let fValues = values |> Array.tail |> Array.fold (sprintf "%s, %s") (values |> Array.head |> sprintf "%O") |> sprintf "(%s)"
+        table, fNames, fValues
 module Logs =
     open System
     open System.IO

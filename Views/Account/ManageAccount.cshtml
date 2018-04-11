@@ -1,9 +1,10 @@
 @{
     ViewData["Title"] = "Главная страница"; //@model 
     //bool IsAuthenticated = (bool)ViewData["IsAuthenticated"];
+    bool isCurator = (bool)ViewData["IsCurator"];
 }
 
-<h3>Доступный функционал:</h3>
+<h3>Управление аккаунтом:</h3>
 
 <table class="table">
   <thead>
@@ -24,15 +25,22 @@
         <td>Создать мероприятие</td>
         <td><a asp-controller="Functions" asp-action="CreateEvent" class="btn btn-primary" >Перейти</a></td>
     </tr>
+    @if(isCurator)
+    {
+
+    }
+    else
+    {
+      <tr>
+        <th scope="row">3</th>
+        <td>Заполнить анкету</td>
+        <td><a asp-controller="Functions" asp-action="StudentAnceta" class="btn btn-primary">Перейти</a></td>
+      </tr>
+    }
     <tr>
-      <th scope="row">3</th>
-      <td>Заполнить анкету</td>
-      <td><a asp-controller="Functions" asp-action="StudentAnceta" class="btn btn-primary">Перейти</a></td>
-  </tr>
-  <tr>
-    <th scope="row">4</th>
-    <td>Собщить об участии в событии(ях)</td>
-    <td><a asp-controller="Functions" asp-action="EventsInfo" class="btn btn-primary">Перейти</a></td>
-  </tr>
+      <th scope="row">4</th>
+      <td>Собщить об участии в событии(ях)</td>
+      <td><a asp-controller="Functions" asp-action="EventsInfo" class="btn btn-primary">Перейти</a></td>
+    </tr>
 </tbody>
 </table>

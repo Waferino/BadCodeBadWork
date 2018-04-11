@@ -38,3 +38,20 @@ let (t'', v'') = System.Int32.TryParse(v)
 
 [1; 2; 3; 2; 3; 4; 5; 6; 7; 1; 8] |> List.filter (fun d -> d = 9)
 "14-03-2018" |> fun s -> System.DateTime.Parse(s) |> fun d -> d.ToString("MM-dd-yyyy")
+
+
+let str = "Hello, world!"
+let toWords (str: string) = str.Split ([|' '; ','; '.'; '-'; '\''; '|'; '/'; ';'|]) |> Array.filter (fun e -> e <> "")
+toWords "мастер, ЗАО \"Пиписька\""
+
+let curPow a d = System.Math.Pow (a, d)
+curPow 2. 4.
+
+// let times = asyncSeq {
+
+// }
+
+let (<?>) (f: bool) (s: bool) = (f, s) |> function (false, false) -> false | (_, _) -> true
+let (<??>) f s = (f, s) |> function (p, _) when p |> isNull |> not -> p | (_, p) -> p
+
+false <?> false <?> true

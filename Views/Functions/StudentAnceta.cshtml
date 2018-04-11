@@ -3,6 +3,11 @@
     ViewData["Title"] = "Анкета";   //http://localhost:55455/Functions/StudentAnceta
     var groups = (IEnumerable<string>)ViewData["Groups"];
     var SLgroups = new SelectList(groups);
+    string AdTitle = "Если проживаете по прописке - адрес фактического проживания можно не заполнять";
+    var langs = (IEnumerable<string>)ViewData["Languages"];
+    var SLlangs = new SelectList(langs);
+    var famstatus = (IEnumerable<string>)ViewData["Family_Status"];
+    var SLfamst = new SelectList(famstatus);
 }
 <div class="panel-body">
   <form asp-controller="Functions" asp-action="StudentAnceta" method="POST" >
@@ -65,10 +70,20 @@
               </div>
           </div>
           <div class="form-group row">
+              <label for="exam_power" class="col-md-2 control-label" title="">Сумма баллов при поступлении:</label>
+              <div>
+                  <div class="col-md-1">
+                      <input class="form-control" asp-for="exam_power" value="@Model.exam_power" />
+                  </div>
+              </div>
+          </div>
+          <div class="form-group row">
               <label for="family_status" class="col-md-2 control-label">Семейное положение:</label>
               <div>
                   <div class="col-md-4">
-                      <input class="form-control" asp-for="family_status" value="@Model.family_status" placeholder="замужем / не замужем, женат / холост" />
+                      <select class="form-control" asp-for="family_status" asp-items="@SLfamst">
+                          <option>@Model.family_status</option>
+                      </select>
                   </div>
               </div>
           </div>
@@ -115,7 +130,7 @@
               </div>
           </div>
           <div class="form-group row">
-              <label class="col-md-2 control-label" title="Если проживаете по прописке - адрес фактического проживания можно не заполнять">Адрес прописки:</label>
+              <label class="col-md-2 control-label" title="@AdTitle">Адрес прописки:</label>
               <div>
                   <div class="col-md-1">
                       <input class="form-control" asp-for="pIndex" value="@Model.pIndex" placeholder="Индекс" />
@@ -141,7 +156,7 @@
               </div>
           </div>
           <div class="form-group row">
-              <label class="col-md-2 control-label" title="">Адрес проживания:</label>
+              <label class="col-md-2 control-label" title="@AdTitle">Адрес проживания:</label>
               <div>
                   <div class="col-md-1">
                       <input class="form-control" asp-for="fIndex" value="@Model.fIndex" placeholder="Индекс" />
@@ -186,7 +201,10 @@
               <label for="alter_lang" class="col-md-2 control-label" title="">Изучаемый иностранный язык:</label>
               <div>
                   <div class="col-md-2">
-                      <input class="form-control" asp-for="alter_lang" value="@Model.alter_lang" />
+                      <!-- <input class="form-control" asp-for="alter_lang" value="@Model.alter_lang" /> -->
+                      <select class="form-control" asp-for="alter_lang" asp-items="@SLlangs" >
+                          <option>@Model.alter_lang</option>
+                      </select>
                   </div>
               </div>
           </div>
@@ -241,10 +259,16 @@
               <label class="col-md-2 control-label" title="">Контактные лица:</label>
               <div>
                   <div class="col-md-3">
-                      <textarea class="form-control" asp-for="motherContact" rows="3" placeholder="Ф.И.О. матери, кем и где работает, телефон рабочий">@Model.motherContact</textarea>
+                      @*<textarea class="form-control" asp-for="motherContact" rows="3" placeholder="Ф.И.О. матери, кем и где работает, телефон рабочий">@Model.motherContact</textarea>*@
+                      <input class="form-control" asp-for="MotherFIO" placeholder="Ф.И.О. матери" value="@Model.MotherFIO" />
+                      <input class="form-control" asp-for="MotherRangAndWork" placeholder="Кем и где работает" value="@Model.MotherRangAndWork" />
+                      <input class="form-control" asp-for="MotherWorkerPhone" placeholder="Рабочий телефон" value="@Model.MotherWorkerPhone" />
                   </div>
                   <div class="col-md-3">
-                      <textarea class="form-control" asp-for="fatherContact" rows="3" placeholder="Ф.И.О. отца, кем и где работает, телефон рабочий">@Model.fatherContact</textarea>
+                      @*<textarea class="form-control" asp-for="fatherContact" rows="3" placeholder="Ф.И.О. отца, кем и где работает, телефон рабочий">@Model.fatherContact</textarea>*@
+                      <input class="form-control" asp-for="FatherFIO" placeholder="Ф.И.О. отца" value="@Model.FatherFIO" />
+                      <input class="form-control" asp-for="FatherRangAndWork" placeholder="Кем и где работает" value="@Model.FatherRangAndWork" />
+                      <input class="form-control" asp-for="FatherWorkerPhone" placeholder="Рабочий телефон" value="@Model.FatherWorkerPhone" />
                   </div>
               </div>
           </div>

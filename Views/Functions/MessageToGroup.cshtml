@@ -3,11 +3,11 @@
     ViewData["Title"] = "Сообщение группе";
 }
 <div class="panel-body">
-  <form asp-controller="Functions" asp-action="MessageToStudent" method="POST" >
+  <form asp-controller="Functions" asp-action="MessageToGroup" method="POST" >
           <fieldset>
             <legend class="row col-md-offset-1">Сообщение группе</legend>
             <div>
-              <input type="hidden" asp-for="id_student" value=@Model.id_group />
+              <input type="hidden" asp-for="id_group" value=@Model.id_group />
             </div>
             <div class="form-group row">
               <label asp-for="message_subject" class="col-md-2 control-label">Тема сообщения:</label>

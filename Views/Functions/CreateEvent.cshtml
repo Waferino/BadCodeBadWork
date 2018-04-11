@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Создание события";
     int ChangedBy = (int)ViewData["id_man"];
+    bool isCurator = (bool)ViewData["IsCurator"];
 }
 <div class="panel-body">
   <form asp-controller="Functions" asp-action="CreateEvent" method="POST" >
@@ -11,6 +12,16 @@
               <label asp-for="DateOfThe" class="col-md-2 control-label">Ожидаемая дата проведения:</label>
               <input type="text" @*id="datepicker"*@ class="form-control selector" asp-for="DateOfThe" value=@Model.DateOfThe />
             </div>
+            @if(isCurator)
+            {
+              <div class="form-group row">
+                <label asp-for="whosEvent" class="col-md-2 control-label">Чьё это событие? </label>
+                <select asp-for="whosEvent" class="form-control">
+                  <option selected>@Model.whosEvent</option>
+                  <option>Куратора</option>
+                </select>
+              </div>
+            }
             <div class="form-group row">
               <label asp-for="Name" class="col-md-2 control-label">Название события:</label>
               <input class="form-control" asp-for="Name" value=@Model.Name />

@@ -1,0 +1,4 @@
+10:57:27: <|"INSERT INTO `eventinfo` ( `DateOfThe`, `Name`, `Notation`, `ChangedBy`) VALUES ( '2018-04-10 0:00:00', 'Зачет по ИТ', 'нихера не учил! как сдавать не знаю', '1717');"|>
+11:05:54: <|"INSERT INTO `event` ( `id_EventInfo`, `isGroup_Event`, `fk_student_or_group`, `event_result`, `creatingDate`) VALUES ( '1', 'False', '1717', 'не учил', '04-05-2018');"|>
+04:50:20: <|"INSERT INTO `account` ( `id_man`, `Email`, `Password`, `Role`, `date_of_change`) VALUES ( '1717', 'nekomata93@gmail.com', 'kagura', 'student', '04-05-2018');"|>
+04:52:37: <|"INSERT INTO `account` ( `id_man`, `Email`, `Password`, `Role`, `date_of_change`) VALUES ( '1717', 'nekomata93@gmail.com', 'kagura', 'student', '04-05-2018');"|>
