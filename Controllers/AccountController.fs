@@ -18,7 +18,7 @@ open Microsoft.AspNetCore.Http.Extensions
 open Starikov
 
 [<Authorize>]
-type AccountController (context: IMyDBContext, arh: IAccountRegistrationHelper) =
+type AccountController (context: IBaseSQLCommands, arh: IAccountRegistrationHelper) =
     inherit Controller()
 
     member val ctx = context with get
@@ -44,7 +44,7 @@ type AccountController (context: IMyDBContext, arh: IAccountRegistrationHelper) 
         //let FIO_equa (surname: string) (name: string) (patron: string) = sprintf "%s %c. %c." (surname.ToLowerInvariant()) ((name.ToLowerInvariant()) |> Seq.head) ((patron.ToLowerInvariant()) |> Seq.head)
         let self_user = 
             let ps = 
-                this.ctx.GetPeoples //|> Seq.toArray//|> Array.Parallel.partition
+                this.ctx |> ATP.GetPeoples //|> Seq.toArray//|> Array.Parallel.partition
                 |> Seq.filter (fun p -> (p.fam.ToLowerInvariant() |> Spaceless = (regInfo.Lastname.ToLowerInvariant() |> Spaceless))) //|> fun (g, ng) -> g
                 |> Seq.filter (fun p -> (p.name.ToLowerInvariant() |> Spaceless |> Seq.head = (regInfo.Firstname.ToLowerInvariant() |> Spaceless |> Seq.head)))
                 |> Seq.filter (fun p -> (p.otchestvo.ToLowerInvariant() |> Spaceless |> Seq.head =  (regInfo.Midlename.ToLowerInvariant() |> Spaceless |> Seq.head)))
@@ -58,20 +58,20 @@ type AccountController (context: IMyDBContext, arh: IAccountRegistrationHelper) 
                 None
             else
                 ps |> Seq.filter (fun p -> 
-                    let s = (this.ctx :?> IBaseSQLCommands).GetFiltered (fun (s: Student) -> s.id_man = p.id_man) |> Seq.head
+                    let s = this.ctx.GetFiltered (fun (s: Student) -> s.id_man = p.id_man) |> Seq.head
                     s.number_zach = regInfo.Number)
                 |> Seq.tryHead
         self_user |> printfn "Inner val: \"%A\""
         if self_user.IsNone || (regInfo.Password.ToLowerInvariant() <> regInfo.rePassword.ToLowerInvariant()) then this.RedirectToAction("Register", regInfo)
         else
             let user = self_user.Value
-            let acc_op = this.ctx.GetAccounts |> Seq.filter (fun a -> user.id_man = a.id_man) |> Seq.tryHead
+            let acc_op = this.ctx |> ATP.GetAccounts |> Seq.filter (fun a -> user.id_man = a.id_man) |> Seq.tryHead
             if acc_op.IsSome then this.RedirectToAction("Register", regInfo)
             else
                 let specialWord_curator = this.AccRegHelper.GetCuratorsKeyWord
                 let acc = new Starikov.dbModels.Account(id_man = user.id_man, Email = regInfo.Email.ToLowerInvariant(), Password = regInfo.Password.ToLowerInvariant(), Role = "student", date_of_change = System.DateTime.Now.ToString("MM-dd-yyyy"))
                 if regInfo.SpecialWord |> isNull |> not && regInfo.SpecialWord.ToLowerInvariant() = specialWord_curator.ToLowerInvariant() then acc.Role <- "curator"
-                let res = this.ctx.InsertAccount acc
+                let res = ATP.InsertAccount this.ctx acc
                 if res then 
                     Authenticate acc.id_man acc.Role |> ignore
                     this.RedirectToAction("Index", "Home")
@@ -91,25 +91,25 @@ type AccountController (context: IMyDBContext, arh: IAccountRegistrationHelper) 
             claims.Add(new Claim("PSTU_Role", role))
             let id = new ClaimsIdentity(claims, "ApplicationCookie", ClaimsIdentity.DefaultNameClaimType, ClaimsIdentity.DefaultRoleClaimType)
             this.HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(id))//this.RedirectToAction("Login", "Account", "Wrong!")
-        let acc_op = this.ctx.GetAccounts |> Seq.filter (fun a -> a.Email = logInfo.Login && a.Password = logInfo.Identity) |> Seq.tryHead
+        let acc_op = this.ctx |> ATP.GetAccounts |> Seq.filter (fun a -> a.Email = logInfo.Login && a.Password = logInfo.Identity) |> Seq.tryHead
         if acc_op.IsNone then this.RedirectToAction("Login", "Account", "Wrong!")
         else
             let acc = acc_op.Value
-            Authenticate acc.id_man acc.Role
+            Authenticate acc.id_man acc.Role |> ignore
             this.RedirectToAction("Index", "Home")
     member this.Logout () =
         this.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme) |> ignore
         this.RedirectToAction("Index", "Home")
     member this.ManageAccount () =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         this.ViewData.["IsCurator"] <- this.User.Claims |> Commands.IsCurator
         this.View()
     member this.Info () =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         let man_id = this.User.Identity.Name
-        let acc = this.ctx.GetAccount man_id
+        let acc = ATP.GetAccount this.ctx man_id
         //let persPrNames = (acc.Person :> ICafedraEntities).GetNamesOfProperties
         let personVal = acc.Person |> Commands.Getter |> Array.zip ((acc.Person :> ICafedraEntities).GetNamesOfProperties()) |> Array.map (fun (n, (f, s)) -> new CSharpDuoTurple(PrName = n, PrRealName = f, PrValue = s))
         //let studPrNames = (acc.Student :> ICafedraEntities).GetNamesOfProperties
@@ -118,29 +118,29 @@ type AccountController (context: IMyDBContext, arh: IAccountRegistrationHelper) 
         this.View(ret)
     member this.ChangePassword () =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         this.View()
     [<HttpPost>]
     member this.ChangePassword (newPass: string, retrynewPass: string) =
         if newPass <> retrynewPass then this.RedirectToAction("ChangePassword")
         else
             let id_man = this.User.Identity.Name |> int
-            let acc = this.ctx.GetAccounts |> Seq.filter (fun a -> a.id_man = id_man) |> Seq.head
+            let acc = this.ctx |> ATP.GetAccounts |> Seq.filter (fun a -> a.id_man = id_man) |> Seq.head
             let new_acc = new Account(id_man = acc.id_man, Email = acc.Email, Password = newPass, Role = acc.Role, date_of_change = System.DateTime.Now.ToString("MM-dd-yyyy"))
             let query, logs = QueryBuilder.BuildUpdateQuery acc new_acc
-            (this.ctx :?> IBaseSQLCommands).Execute query logs |> ignore
+            this.ctx.Execute query logs |> ignore
             this.RedirectToAction("ManageAccount")
     member this.ChangeEmail () =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         this.View()
     [<HttpPost>]
     member this.ChangeEmail (newEmail: string) =
         if newEmail = "" || newEmail |> isNull then this.RedirectToAction("ChangePassword")
         else
             let id_man = this.User.Identity.Name |> int
-            let acc = this.ctx.GetAccounts |> Seq.filter (fun a -> a.id_man = id_man) |> Seq.head
+            let acc = this.ctx |> ATP.GetAccounts |> Seq.filter (fun a -> a.id_man = id_man) |> Seq.head
             let new_acc = new Account(id_man = acc.id_man, Email = newEmail, Password = acc.Password, Role = acc.Role, date_of_change = System.DateTime.Now.ToString("MM-dd-yyyy"))
             let query, logs = QueryBuilder.BuildUpdateQuery acc new_acc
-            (this.ctx :?> IBaseSQLCommands).Execute query logs |> ignore
+            this.ctx.Execute query logs |> ignore
             this.RedirectToAction("ManageAccount")

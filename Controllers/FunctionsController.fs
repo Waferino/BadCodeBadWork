@@ -17,31 +17,46 @@ open Microsoft.AspNetCore.Mvc.ModelBinding
 open Microsoft.AspNetCore.Http.Extensions
 open System.Reflection.Metadata
 open System.IO
+open Org.BouncyCastle.Asn1.Misc
 
 
-type FunctionsController (context: IMyDBContext, mes: IMessager) =
+type FunctionsController (context: IBaseSQLCommands, mes: IMessager) =
     inherit Controller()
     member val ctx = context with get
     member val messager = mes with get
-    //[<Authorize>]
+    //[<Authorize>] 
     member this.GroupInfo () =
         let isAuth = this.User.Identity.IsAuthenticated
         this.ViewData.["IsAuthenticated"] <- isAuth
-        if isAuth then 
-            this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
-            let isCur = Commands.IsCurator this.User.Claims
-            this.ViewData.["IsCurator"] <- isCur
-            this.ViewData.["UserId"] <- this.User.Identity.Name
-        let groups = this.ctx.GetGroups
+        let groups =    
+            if isAuth then 
+                this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
+                let isCur = Commands.IsCurator this.User.Claims
+                this.ViewData.["IsCurator"] <- isCur
+                this.ViewData.["UserId"] <- this.User.Identity.Name
+                if isCur then
+                    //let id = this.User.Identity.Name |> int
+                    let tr, fs = this.ctx |> ATP.GetGroups |> Commands.permission (fun g -> g.kurator = this.User.Identity.Name)
+                    seq {yield! tr; yield! fs}
+                else seq {
+                    let id = this.ctx.GetFiltered (fun (s: Student) -> s.id_man = (this.User.Identity.Name |> int)) |> Seq.head
+                    let gs = this.ctx |> ATP.GetGroups
+                    if id.id_group.HasValue then
+                        let tr, fs = gs |> Commands.permission (fun g -> g.id_group = id.id_group.Value)
+                        yield! tr; yield! fs
+                    else
+                        yield! gs
+                }
+            else this.ctx |> ATP.GetGroups
         this.View(groups)
     member this.OneGroupInfo (id : int) =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        if this.User.Identity.IsAuthenticated then this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
-        this.ViewData.["Group_name"] <- this.ctx.GetOneGroup id |> Option.map (fun g -> g.name_group) |> Option.get
+        if this.User.Identity.IsAuthenticated then this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
+        this.ViewData.["Group_name"] <- ATP.GetOneGroup this.ctx id |> Option.map (fun g -> g.name_group) |> Option.get
         let students = 
-            this.ctx.GetGroupStudents id
+            ATP.GetGroupStudents this.ctx id
             |> Seq.map (fun s ->
-                                        let acc = this.ctx.GetAccount ((s.id_man).ToString())
+                                        let acc = ATP.GetAccount this.ctx ((s.id_man).ToString())
                                         let personVal = 
                                             acc.Person 
                                             |> Commands.Getter 
@@ -54,7 +69,7 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
                                                                         if n <> "id_group" then 
                                                                             (n, v)
                                                                         else
-                                                                            let v' = v |> this.ctx.GetOneGroup |> Option.map (fun gr' -> gr'.name_group :> obj)
+                                                                            let v' = v |> ATP.GetOneGroup this.ctx |> Option.map (fun gr' -> gr'.name_group :> obj)
                                                                             if v' |> Option.isSome then (n, (v' |> Option.get))
                                                                             else (n, ("-" :> obj)))
                                             |> Array.zip ((acc.Student :> ICafedraEntities).GetNamesOfProperties()) 
@@ -70,11 +85,11 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
         this.View(students)
     member this.StudentInfo () =    // VERY SLOW!!! NEED PARALLELING, BUT PROBLEMS IN DB ACCESS 
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        if this.User.Identity.IsAuthenticated then this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        if this.User.Identity.IsAuthenticated then this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         let students = 
-            this.ctx.GetStudents 
+            this.ctx |> ATP.GetStudents 
             |> Seq.map (fun s ->
-                                        let acc = this.ctx.GetAccount ((s.id_man).ToString())
+                                        let acc = ATP.GetAccount this.ctx ((s.id_man).ToString())
                                         let personVal = 
                                             acc.Person 
                                             |> Commands.Getter 
@@ -87,7 +102,7 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
                                                                         if n <> "id_group" then 
                                                                             (n, v)
                                                                         else
-                                                                            let v' = v |> this.ctx.GetOneGroup |> Option.map (fun gr' -> gr'.name_group :> obj)
+                                                                            let v' = v |> ATP.GetOneGroup this.ctx |> Option.map (fun gr' -> gr'.name_group :> obj)
                                                                             if v' |> Option.isSome then (n, (v' |> Option.get))
                                                                             else (n, ("-" :> obj)))
                                             |> Array.zip ((acc.Student :> ICafedraEntities).GetNamesOfProperties()) 
@@ -101,33 +116,32 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
     member this.EventsInfo () =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
         this.ViewData.["IsStudent"] <- this.User.Claims |> Commands.IsStudent
-        if this.User.Identity.IsAuthenticated then this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
-        let EventsInfos = this.ctx.GetEventsInfos
+        if this.User.Identity.IsAuthenticated then this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
+        let EventsInfos = this.ctx |> ATP.GetEventsInfos
         let retD = EventsInfos |> Seq.filter (fun ei -> String.IsNullOrEmpty(ei.DateOfThe) |> not) |> Seq.map (fun ei -> DateTime.Parse(ei.DateOfThe), ei) |> Seq.sortBy (fun (d, _) -> d) |> Seq.map (fun (_, ei) -> ei)
         let retU = EventsInfos |> Seq.filter (fun ei -> String.IsNullOrEmpty(ei.DateOfThe)) |> Seq.sortBy (fun ei -> ei.Name)
         let ret = seq { for ei in retD -> ei
                         for ei in retU -> ei }
         if this.User.Identity.IsAuthenticated then
-            let mid, gid = this.ctx.GetAccount this.User.Identity.Name |> (fun a -> (a.Person.id_man, (if a.IsStudent then (if a.Student.id_group.HasValue then a.Student.id_group.Value else 0) else 0) ) )
-            let ct = this.ctx :?> IBaseSQLCommands
-            let evts = ct.Get (new Starikov.dbModels.Event())
+            let mid, gid = ATP.GetAccount this.ctx this.User.Identity.Name |> (fun a -> (a.Person.id_man, (if a.IsStudent then (if a.Student.id_group.HasValue then a.Student.id_group.Value else 0) else 0) ) )
+            let evts = this.ctx.Get (new Starikov.dbModels.Event())
             this.ViewData.["meEvents"] <- evts |> Seq.filter (fun e -> if e.isGroup_Event then e.fk_student_or_group = gid else e.fk_student_or_group = mid) |> Seq.map (fun e -> printfn "id_EI: %A"; e.id_EventInfo)
             this.ViewData.["groupEvents"] <- evts |> Seq.filter (fun e -> e.isGroup_Event) |> Seq.filter (fun e -> e.fk_student_or_group = gid) |> Seq.map (fun e -> printfn "id_EI: %A"; e.id_EventInfo)
         this.View(ret)
     [<Authorize>]
     member this.CreateEvent () =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         this.ViewData.["id_man"] <- this.User.Identity.Name |> int
         this.ViewData.["IsCurator"] <- this.User.Claims |> Commands.IsCurator
         this.View(new Starikov.dbModels.EventInfo(whosEvent = "Студентов"))
     [<Authorize>]
     [<HttpPost>]
     member this.CreateEvent (event: EventInfo) = //INSERT INTO `www0005_base`.`eventinfo` (`DateOfThe`, `Name`) VALUES ('2010.11.10', 'Поход на лыжах');
-        let sei = this.ctx.GetEventsInfos |> Seq.filter (fun ei -> ei.id_EventInfo = event.id_EventInfo) |> Seq.tryHead
+        let sei = this.ctx |> ATP.GetEventsInfos |> Seq.filter (fun ei -> ei.id_EventInfo = event.id_EventInfo) |> Seq.tryHead
         event.creatingDate <- DateTime.Now.ToString("MM-dd-yyyy")
         if sei.IsNone then
-            let res = this.ctx.InsertEventInfo event
+            let res = ATP.InsertEventInfo this.ctx event
             res |> printfn "Event(\"%s\") is created? <%b>" event.Name
         else 
             let ei = sei.Value
@@ -138,21 +152,21 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
     [<Authorize>]
     member this.EditEventInfo (id: int) =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         this.ViewData.["id_man"] <- this.User.Identity.Name |> int
         this.ViewData.["IsCurator"] <- this.User.Claims |> Commands.IsCurator
-        let ei = this.ctx.GetEventsInfos |> Seq.filter (fun ei -> ei.id_EventInfo = id) |> Seq.head
+        let ei = this.ctx |> ATP.GetEventsInfos |> Seq.filter (fun ei -> ei.id_EventInfo = id) |> Seq.head
         this.View(ei)
     [<Authorize>]
     member this.RemoveEventInfo (id: int) =
-        let res = this.ctx.GetEventsInfos |> Seq.filter (fun ei -> ei.id_EventInfo = id) |> Seq.head |> this.ctx.Remove
+        let res = this.ctx |> ATP.GetEventsInfos |> Seq.filter (fun ei -> ei.id_EventInfo = id) |> Seq.head |> ATP.Remove this.ctx
         this.RedirectToAction("EventsInfo")
     [<Authorize>]
     member this.ChooseGroup (id_ei: int) =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         this.ViewData.["id_EventInfo"] <- id_ei
-        let groups = this.ctx.GetGroups
+        let groups = this.ctx |> ATP.GetGroups
         let model = if this.User.Claims |> Commands.IsCurator then groups |> Seq.filter (fun g -> g.kurator = this.User.Identity.Name) else groups
         this.View(model)
     [<Authorize>]
@@ -161,7 +175,7 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
     [<Authorize>]
     member this.CheckInEvent (id_gr: int, id_ei: int) =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         this.ViewData.["id_man"] <- this.User.Identity.Name |> int
         if id_gr <> 0 then this.ViewData.["isGE"] <- true else this.ViewData.["isGE"] <- false
         this.ViewData.["id_Group"] <- id_gr
@@ -171,7 +185,7 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
     (*[<Authorize>]
     member this.CheckInEvent (id_ei: int) =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         this.ViewData.["isGE"] <- false
         this.ViewData.["id_EventInfo"] <- id_ei
         let model = new Starikov.dbModels.Event(id_EventInfo = id_ei)
@@ -182,22 +196,22 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
         let isStudent = Commands.IsStudent <| this.User.Claims
         let id_man = this.User.Identity.Name |> int
         event.creatingDate <- (System.DateTime.Now.ToString("MM-dd-yyyy"))
-        let res = this.ctx.InsertEvent event
+        let res = ATP.InsertEvent this.ctx event
         printfn "RESULT: %A" res
         this.RedirectToAction("EventsInfo")
     [<Authorize(Policy = "StudentOnly")>]
     member this.ManageEvent (id_ei: int) =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
-        let event = (this.ctx :?> IBaseSQLCommands).Get (new Starikov.dbModels.Event()) |> Seq.filter (fun e -> e.id_EventInfo = id_ei && e.fk_student_or_group = (this.User.Identity.Name |> int)) |> Seq.head
-        let ei = this.ctx.GetEventsInfos |> Seq.filter (fun ei -> ei.id_EventInfo = event.id_EventInfo) |> Seq.head
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
+        let event = this.ctx.Get (new Starikov.dbModels.Event()) |> Seq.filter (fun e -> e.id_EventInfo = id_ei && e.fk_student_or_group = (this.User.Identity.Name |> int)) |> Seq.head
+        let ei = this.ctx |> ATP.GetEventsInfos |> Seq.filter (fun ei -> ei.id_EventInfo = event.id_EventInfo) |> Seq.head
         this.ViewData.["EI_Name"] <- ei.Name
         this.ViewData.["EI_Notation"] <- ei.Notation
         this.View(event)
     [<Authorize(Policy = "StudentOnly")>]
     member this.AddExtraEvent (id_event: int) =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         //let model = new ExtraEvent(id_Event = id_event)
         this.ViewData.["id_Event"] <- id_event
         this.View()
@@ -217,12 +231,12 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
             use stream = new FileStream(path, FileMode.Create)
             file.CopyTo(stream)
             let extraEvent = new ExtraEvent(id_Event = id_event, fileName = file.FileName, contentType = file.ContentType, fileDataPath = path, creatingDate = DateTime.Now.ToString("MM-dd-yyyy"))
-            let res = this.ctx.InsertExtraEvent <| extraEvent
+            let res = ATP.InsertExtraEvent this.ctx extraEvent
             printfn "ExtraEvent insert result: <%b>" res
             this.RedirectToAction("EventsInfo")
     [<Authorize(Policy = "StudentOnly")>]
     member this.CheckOutEvent (id_event: int) =
-        let res = (this.ctx :?> IBaseSQLCommands).Get (new Starikov.dbModels.Event()) |> Seq.filter (fun e -> e.id_Event = id_event) |> Seq.head |> this.ctx.Remove
+        let res = this.ctx.Get (new Starikov.dbModels.Event()) |> Seq.filter (fun e -> e.id_Event = id_event) |> Seq.head |> ATP.Remove this.ctx
         let path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "ExtraEvents_Students_files", this.User.Identity.Name, id_event.ToString())
         let di = new DirectoryInfo(path)
         if di.Exists then
@@ -232,15 +246,15 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
     [<Authorize>]
     member this.StudentAnceta () =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
-        this.ViewData.["Groups"] <- this.ctx.GetGroups |> Seq.map (fun g -> g.name_group)
-        this.ViewData.["Languages"] <- (this.ctx :?> IBaseSQLCommands).Get (new LanguageDictionary()) |> Seq.map (fun lang -> lang.langName)
-        this.ViewData.["Family_Status"] <- this.ctx.GetAccount this.User.Identity.Name |> fun ai -> ai.Person.pol |> function "1" -> ["Женат"; "Холост"] | "2" -> ["Замужем"; "Не замужем"] | _ -> ["Женат"; "Холост"; "Замужем"; "Не замужем"]
-        this.View(this.ctx.GetAnceteData <| this.User.Identity.Name)
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
+        this.ViewData.["Groups"] <- this.ctx |> ATP.GetGroups |> Seq.map (fun g -> g.name_group)
+        this.ViewData.["Languages"] <- this.ctx.Get (new LanguageDictionary()) |> Seq.map (fun lang -> lang.langName)
+        this.ViewData.["Family_Status"] <- ATP.GetAccount this.ctx this.User.Identity.Name |> fun ai -> ai.Person.pol |> function "1" -> ["Женат"; "Холост"] | "2" -> ["Замужем"; "Не замужем"] | _ -> ["Женат"; "Холост"; "Замужем"; "Не замужем"]
+        this.View(ATP.GetAnceteData this.ctx this.User.Identity.Name)
     [<Authorize>]
     [<HttpPost>]
     member this.StudentAnceta (ancet: Anceta) =
-        let res = this.ctx.SetAnceteData this.User.Identity.Name ancet
+        let res = ATP.SetAnceteData this.ctx this.User.Identity.Name ancet
         if res |> not then 
             printfn "При обработке анкеты(%s) возникли проблеммы" ( sprintf "%s %c.%c." ancet.lastname ancet.name.[0] ancet.patron.[0] )
             this.RedirectToAction("Functions", "StudentAnceta", ancet)
@@ -249,18 +263,18 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
     [<Authorize(Policy = "CuratorOnly")>]
     member this.MessageToGroup (id_group: int) =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         this.ViewData.["id_group"] <- id_group
         this.View(new MessageToGroupModel(id_group = id_group))
     [<Authorize(Policy = "CuratorOnly")>]
     [<HttpPost>]
     member this.MessageToGroup (model: MessageToGroupModel) =
         let students = 
-            let s = this.ctx.GetStudents |> Seq.filter (fun st -> st.id_group.HasValue && st.id_group.Value = model.id_group)
+            let s = this.ctx |> ATP.GetStudents |> Seq.filter (fun st -> st.id_group.HasValue && st.id_group.Value = model.id_group)
             if Seq.length <| s > 0 then s |> Seq.map (fun st -> st.id_man) else Seq.empty
         if students |> Seq.isEmpty |> not then
-            let peoples_data = this.ctx.GetPeoples |> Seq.filter (fun p -> (Seq.contains p.id_man students)) //|> Seq.map (fun p -> ((sprintf "%s %c.%c." p.fam p.name.[0] p.otchestvo.[0]), p.id_man))
-            let accs_data = (this.ctx :?> IBaseSQLCommands).GetFiltered (fun (a: dbModels.Account) -> peoples_data |> Seq.map (fun p -> p.id_man) |> Seq.contains a.id_man) |> Seq.map (fun a -> peoples_data |> Seq.filter (fun p -> p.id_man = a.id_man) |> Seq.head |> fun p -> ((sprintf "%s %c.%c." p.fam p.name.[0] p.otchestvo.[0]), a.Email))
+            let peoples_data = this.ctx |> ATP.GetPeoples |> Seq.filter (fun p -> (Seq.contains p.id_man students)) //|> Seq.map (fun p -> ((sprintf "%s %c.%c." p.fam p.name.[0] p.otchestvo.[0]), p.id_man))
+            let accs_data = this.ctx.GetFiltered (fun (a: dbModels.Account) -> peoples_data |> Seq.map (fun p -> p.id_man) |> Seq.contains a.id_man) |> Seq.map (fun a -> peoples_data |> Seq.filter (fun p -> p.id_man = a.id_man) |> Seq.head |> fun p -> ((sprintf "%s %c.%c." p.fam p.name.[0] p.otchestvo.[0]), a.Email))
             if accs_data |> Seq.isEmpty |> not then
                 this.messager.SendMessage model.message_subject model.message_body accs_data
             else
@@ -271,18 +285,18 @@ type FunctionsController (context: IMyDBContext, mes: IMessager) =
     [<Authorize(Policy = "CuratorOnly")>]
     member this.MessageToStudent (id_student: int) =
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         //printfn "id_student in \"MessageToStudent\": %A" id_student
         this.ViewData.["id_student"] <- id_student
         this.View(new MessageToStudentModel(id_student = id_student))
     [<Authorize(Policy = "CuratorOnly")>]
     [<HttpPost>]
     member this.MessageToStudent (model: MessageToStudentModel) =
-        let student = this.ctx.GetPeoples |> Seq.filter (fun p -> p.id_man = model.id_student) |> Seq.tryHead
+        let student = this.ctx |> ATP.GetPeoples |> Seq.filter (fun p -> p.id_man = model.id_student) |> Seq.tryHead
         if student.IsSome then
-            let acc = (this.ctx :?> IBaseSQLCommands).GetFiltered (fun (a: dbModels.Account) -> a.id_man = student.Value.id_man) |> Seq.tryHead
+            let acc = this.ctx.GetFiltered (fun (a: dbModels.Account) -> a.id_man = student.Value.id_man) |> Seq.tryHead
             if acc.IsSome then
-                let student_data = seq { yield (this.ctx.GetFIO student.Value.id_man, acc.Value.Email) }
+                let student_data = seq { yield (ATP.GetFIO this.ctx student.Value.id_man, acc.Value.Email) }
                 this.messager.SendMessage model.message_subject model.message_body student_data
             else
                 printfn "Error in message to student(%d): missing e_mails" model.id_student

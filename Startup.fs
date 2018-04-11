@@ -26,9 +26,9 @@ type Startup private () =
     // This method gets called by the runtime. Use this method to add services to the container.
     member this.ConfigureServices(services: IServiceCollection) =
         // Add framework services.
-        services.AddTransient<IMyDBContext, CafedraDBContext>() |> ignore
+        services.AddTransient<IBaseSQLCommands, CafedraDBContext>() |> ignore
         //let token = Path.Combine(AppContext.BaseDirectory, "appsettings.json") |> JsonModule.GetBody |> fun body -> new JsonModule.JSON(body)
-        services.AddSingleton<IMyDBContext>(new CafedraDBContext(this.Configuration.["Data:Default:ConnectionString"])) |> ignore
+        services.AddSingleton<IBaseSQLCommands>(new CafedraDBContext(this.Configuration.["Data:Default:ConnectionString"])) |> ignore
         services.AddSingleton<IMessager>(new Messager((this.Configuration.["Messaging:Default:Email"]), (this.Configuration.["Messaging:Default:Password"]))) |> ignore
         services.AddSingleton<IAccountRegistrationHelper>(new AccountRegistrationHelper((this.Configuration.["RegistrationKeyWords:Default:ForAdmins"]), (this.Configuration.["RegistrationKeyWords:Default:ForCurators"]))) |> ignore
         services.AddSingleton<IFileProvider>(new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"))) |> ignore

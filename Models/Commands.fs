@@ -76,6 +76,16 @@ module Commands =
             printfn "For_Account(%s):\tOld value: %O\t->\tNew value: %O" man_id dt a
             true
         else false
+    let permission predicate sequence =
+        let rec worker t f (s: seq<'a>) = s |> function
+            | sq when sq |> Seq.isEmpty -> t, f
+            | sq -> 
+                let h, tl = Seq.head sq, Seq.tail sq
+                if h |> predicate then 
+                    worker (seq {yield! t; yield h}) f tl
+                else
+                    worker t (seq {yield! f; yield h}) tl
+        worker Seq.empty Seq.empty sequence
     let EntityToString entity =
         // let T = entity.GetType()
         let t = Getter entity

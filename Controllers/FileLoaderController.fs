@@ -18,7 +18,7 @@ open Microsoft.AspNetCore.Mvc.ModelBinding
 open Microsoft.AspNetCore.Http.Extensions
 
 
-type FileLoaderController (context: IMyDBContext) =
+type FileLoaderController (context: IBaseSQLCommands) =
     inherit Controller()
     member val ctx = context with get
     //[<Authorize>]

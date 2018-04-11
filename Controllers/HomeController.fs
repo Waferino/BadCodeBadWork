@@ -15,7 +15,7 @@ open Microsoft.Extensions.DependencyModel.Resolution
 open Microsoft.AspNetCore.Mvc.ModelBinding
 
 
-type HomeController (context: IMyDBContext) =
+type HomeController (context: IBaseSQLCommands) =
     inherit Controller()
     member val ctx = context with get
     //[<Authorize>]
@@ -24,21 +24,21 @@ type HomeController (context: IMyDBContext) =
         //if this.User.Identity.IsAuthenticated then this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
         this.ViewData.["IsStudent"] <- this.User.Claims |> Commands.IsStudent
         if this.User.Identity.IsAuthenticated then 
-            let AccountInfo = this.User.Identity.Name |> this.ctx.GetAccount
+            let AccountInfo = this.User.Identity.Name |> ATP.GetAccount this.ctx
             this.ViewData.["AccountInfo"] <- AccountInfo
-            this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+            this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         this.View()
 
     member this.About () =
         this.ViewData.["Message"] <- "Your application description page."
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        if this.User.Identity.IsAuthenticated then this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        if this.User.Identity.IsAuthenticated then this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         this.View()
     //[<Authorize(Policy = "CuratorOnly")>] //It's WORK!!!
     member this.Contact () =
         this.ViewData.["Message"] <- "Igor Starikov"
         this.ViewData.["IsAuthenticated"] <- this.User.Identity.IsAuthenticated
-        if this.User.Identity.IsAuthenticated then this.ViewData.["FIO"] <- this.ctx.GetFIO this.User.Identity.Name
+        if this.User.Identity.IsAuthenticated then this.ViewData.["FIO"] <- ATP.GetFIO this.ctx this.User.Identity.Name
         this.View()
 
     member this.Error () =
